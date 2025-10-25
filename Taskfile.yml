@@ -1,0 +1,13 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - go build -o bin/fs.exe
+  run:
+    deps: [build]
+    cmds:
+      - ./bin/fs.exe
+  test:
+    cmds:
+      - go test ./... -v
