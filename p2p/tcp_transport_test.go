@@ -8,7 +8,10 @@ import (
 
 func TestTcpConn(t *testing.T) {
 	listenAddress := "localhost:5001"
-	tr := NewTcpTransport(listenAddress)
+	tcpOpts := TCPTransportOpts{
+		listenAddress:listenAddress,
+	}
+	tr := NewTcpTransport(tcpOpts)
 
 	assert.Equal(t,tr.listenAddress,listenAddress)
 

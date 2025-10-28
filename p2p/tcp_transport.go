@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"log/slog"
@@ -25,20 +24,23 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 		outbound: outbound,
 	}
 }
-type TCPTransport struct {
+
+type TCPTransportOpts struct{
 	listenAddress string
-	listener      net.Listener
 	shakeHand 	  HandShakerFunc
 	decoder		  Decoder
+}
+type TCPTransport struct {
+	TCPTransportOpts
+	listener      net.Listener
 	mu			  sync.RWMutex
 	peers         map[net.Addr]Peer
 }
 
 
-func NewTcpTransport(listenAddress string) *TCPTransport{
+func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
 	return &TCPTransport{
-		listenAddress: listenAddress,
-		shakeHand: TCPHandShake,
+		TCPTransportOpts: opts,
 	}
 }
 
@@ -70,9 +72,10 @@ type Temp struct{}
 func (tcp *TCPTransport) handleConnection(conn net.Conn){
 	peer := NewTCPPeer(conn,false)
 	
-	if err:= tcp.shakeHand(conn); err!=nil{
+	if err:= tcp.shakeHand(peer); err!=nil{
 		slog.Error("Error occured while handshake with connection","Conn",conn)
-		conn.Close()
+		peer.conn.Close()
+		return
 	}
 	fmt.Printf("New Incoming Connection %+v\n",peer)
 	// Read Loop
