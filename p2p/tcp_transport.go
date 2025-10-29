@@ -26,9 +26,9 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 }
 
 type TCPTransportOpts struct{
-	listenAddress string
-	shakeHand 	  HandShakerFunc
-	decoder		  Decoder
+	ListenAddress string
+	ShakeHand 	  HandShakerFunc
+	Decoder		  Decoder
 }
 type TCPTransport struct {
 	TCPTransportOpts
@@ -46,13 +46,13 @@ func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
 
 func (tcp *TCPTransport) ListenAndAccept() error{
 	var err error
-	tcp.listener,err = net.Listen("tcp",tcp.listenAddress)
+	tcp.listener,err = net.Listen("tcp",tcp.ListenAddress)
 
 	if err != nil{
 		log.Fatal("Error Occured while Initializing listener ",err)
 		return err
 	}
-	slog.Info("Accepting Tcp connection on ","Address",tcp.listenAddress)
+	slog.Info("Accepting Tcp connection on ","Address",tcp.ListenAddress)
 	return tcp.acceptRequests()
 }
 
@@ -67,24 +67,26 @@ func (tcp *TCPTransport) acceptRequests() error{
 	}
 }
 
-type Temp struct{}
-
 func (tcp *TCPTransport) handleConnection(conn net.Conn){
 	peer := NewTCPPeer(conn,false)
 	
-	if err:= tcp.shakeHand(peer); err!=nil{
+	if err:= tcp.ShakeHand(peer); err!=nil{
 		slog.Error("Error occured while handshake with connection","Conn",conn)
 		peer.conn.Close()
 		return
 	}
 	fmt.Printf("New Incoming Connection %+v\n",peer)
 	// Read Loop
-	msg := &Temp{}
+	msg := &Message{}
 	for{
-		if err := tcp.decoder.Decode(conn,msg); err != nil{
+		fmt.Println("hello")
+		if err := tcp.Decoder.Decode(conn,msg); err != nil{
+			fmt.Println("Error")
 			slog.Error("Error occured while Reading the connection","Error",err)
 			continue
 		}
+
+		fmt.Printf("%+v\n",msg)
 	}
 	
 }
