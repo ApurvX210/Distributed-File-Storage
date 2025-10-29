@@ -6,8 +6,13 @@ import (
 )
 
 func main() {
-	listenAddr := "localhost:5001"
-	tcp := p2p.NewTcpTransport(listenAddr)
+	tcpOpts := p2p.TCPTransportOpts{
+		ListenAddress: "localhost:5001",
+		ShakeHand: 	  p2p.TCPHandShake,
+		Decoder:	  p2p.DefaultDecoder{},
+	}
+	
+	tcp := p2p.NewTcpTransport(tcpOpts)
 	log.Fatal(tcp.ListenAndAccept())
 
 	select{}
