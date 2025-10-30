@@ -5,7 +5,6 @@ import (
 	"log"
 	"log/slog"
 	"net"
-	"sync"
 )
 
 // It represent the remote user connected via Tcp protocol
@@ -25,24 +24,33 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 	}
 }
 
+func (peer *TCPPeer) Close() error{
+	return peer.conn.Close()
+}
+
 type TCPTransportOpts struct{
 	ListenAddress string
 	ShakeHand 	  HandShakerFunc
 	Decoder		  Decoder
+	OnPeer		  func(Peer) error
 }
 type TCPTransport struct {
 	TCPTransportOpts
 	listener      net.Listener
-	mu			  sync.RWMutex
-	peers         map[net.Addr]Peer
+	rpcChan		  chan RPC
+	// mu			  sync.RWMutex
+	// peers         map[net.Addr]Peer
 }
 
 
 func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
 	return &TCPTransport{
 		TCPTransportOpts: opts,
+		rpcChan: make(chan RPC),
 	}
 }
+
+// func ()
 
 func (tcp *TCPTransport) ListenAndAccept() error{
 	var err error
@@ -68,25 +76,35 @@ func (tcp *TCPTransport) acceptRequests() error{
 }
 
 func (tcp *TCPTransport) handleConnection(conn net.Conn){
+	var err error
+
+	defer func(){
+		fmt.Printf("Dropping peer connection : %s",err)
+	}()
 	peer := NewTCPPeer(conn,false)
 	
-	if err:= tcp.ShakeHand(peer); err!=nil{
+	if err = tcp.ShakeHand(peer); err!=nil{
 		slog.Error("Error occured while handshake with connection","Conn",conn)
 		peer.conn.Close()
 		return
 	}
+
+	if tcp.OnPeer != nil{
+		if err = tcp.OnPeer(peer); err != nil{
+			return
+		}
+	}
+
 	fmt.Printf("New Incoming Connection %+v\n",peer)
 	// Read Loop
-	msg := &Message{}
+	rpc := &RPC{}
 	for{
 		fmt.Println("hello")
-		if err := tcp.Decoder.Decode(conn,msg); err != nil{
-			fmt.Println("Error")
+		if err = tcp.Decoder.Decode(conn,rpc); err != nil{
 			slog.Error("Error occured while Reading the connection","Error",err)
-			continue
+			return
 		}
-
-		fmt.Printf("%+v\n",msg)
+		rpc.From = peer
+		fmt.Printf("%+v\n",rpc)
 	}
-	
 }
