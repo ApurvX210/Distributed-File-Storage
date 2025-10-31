@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -78,10 +79,11 @@ func (tcp *TCPTransport) acceptRequests() error{
 func (tcp *TCPTransport) handleConnection(conn net.Conn){
 	var err error
 
+	peer := NewTCPPeer(conn,false)
 	defer func(){
+		peer.Close()
 		fmt.Printf("Dropping peer connection : %s",err)
 	}()
-	peer := NewTCPPeer(conn,false)
 	
 	if err = tcp.ShakeHand(peer); err!=nil{
 		slog.Error("Error occured while handshake with connection","Conn",conn)
@@ -101,8 +103,12 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn){
 	for{
 		fmt.Println("hello")
 		if err = tcp.Decoder.Decode(conn,rpc); err != nil{
-			slog.Error("Error occured while Reading the connection","Error",err)
-			return
+			if err == io.EOF{
+				return
+			}else{
+				slog.Error("Error occured while Reading the connection","Error",err)
+				continue
+			}
 		}
 		rpc.From = peer
 		fmt.Printf("%+v\n",rpc)
