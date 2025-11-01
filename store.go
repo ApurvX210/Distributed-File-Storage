@@ -9,13 +9,16 @@ import (
 	"strings"
 )
 
-type PathTranformer func (string) string
+type PathTranformer func (string) PathKey
 
-var DefaultPathTransformer = func(key string)string{
-	return key
+var DefaultPathTransformer = func(key string) PathKey{
+	return PathKey{
+		PathName: key,
+		FileName: key,
+	}
 }
 
-func CASPathTransformer(key string) string{
+func CASPathTransformer(key string) PathKey{
 	hash := sha1.Sum([]byte(key))
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -27,7 +30,20 @@ func CASPathTransformer(key string) string{
 	for i:=0;i<sliceLen;i++{
 		path[i] = hashStr[i*blockSize:i*blockSize+blockSize]
 	}
-	return strings.Join(path,"/")
+
+	return PathKey{
+		PathName: strings.Join(path,"/"),
+		FileName: hashStr,
+	} 
+}
+
+type PathKey struct{
+	PathName string
+	FileName string
+}
+
+func (p *PathKey) GenerateFilePath() string{
+	return p.PathName+"/"+p.FileName
 }
 
 type StoreOpts struct {
@@ -44,17 +60,36 @@ func NewStore(storeOpts StoreOpts) *Store{
 	}
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error{
-	pathName := s.PathTranformerFunc(key)
+func (s *Store) readStream(key string) (io.Reader,error){
+	pathKey := s.PathTranformerFunc(key)
+	filePath := pathKey.GenerateFilePath()
 
-	if err := os.MkdirAll(pathName,os.ModePerm); err != nil{
+	f,err := os.Open(filePath)
+	if err != nil{
+		return nil,err
+	}
+
+	return f,nil
+}
+
+func (s *Store) Read(key string) (io.Reader,error){
+	f,err := s.readStream(key)
+	if err != nil{
+		return nil,err
+	}
+
+}
+
+func (s *Store) writeStream(key string, r io.Reader) error{
+	pathKey := s.PathTranformerFunc(key)
+
+	if err := os.MkdirAll(pathKey.PathName,os.ModePerm); err != nil{
 		return err
 	}
 
-	fileName := "file.txt"
-	pathFileName := pathName+"/"+fileName
+	filePath := pathKey.GenerateFilePath()
 
-	f,err := os.Create(pathFileName)
+	f,err := os.Create(filePath)
 	if err != nil{
 		return err
 	}
@@ -63,7 +98,7 @@ func (s *Store) writeStream(key string, r io.Reader) error{
 	if err != nil{
 		return err
 	}
-	log.Printf("Written {%d} bytes to disk: %s",n,pathFileName)
+	log.Printf("Written {%d} bytes to disk: %s",n,filePath)
 
 	return  nil
 }
