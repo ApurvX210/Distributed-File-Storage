@@ -10,16 +10,17 @@ import (
 	"strings"
 )
 
-type PathTranformer func (string) PathKey
+const DeaultRootFolder = "DFS"
+type PathTranformer func (string,string) PathKey
 
-var DefaultPathTransformer = func(key string) PathKey{
+var DefaultPathTransformer = func(key string,root string) PathKey{
 	return PathKey{
-		PathName: key,
+		PathName: root + "/" + key,
 		FileName: key,
 	}
 }
 
-func CASPathTransformer(key string) PathKey{
+func CASPathTransformer(key string,root string) PathKey{
 	hash := sha1.Sum([]byte(key))
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -33,7 +34,7 @@ func CASPathTransformer(key string) PathKey{
 	}
 
 	return PathKey{
-		PathName: strings.Join(path,"/"),
+		PathName: root + "/" + strings.Join(path,"/"),
 		FileName: hashStr,
 	} 
 }
@@ -43,11 +44,17 @@ type PathKey struct{
 	FileName string
 }
 
+func (p PathKey) firstPathName() string{
+	return strings.Split(p.PathName,"/")[0]
+}
+
 func (p *PathKey) GenerateFilePath() string{
 	return p.PathName+"/"+p.FileName
 }
 
 type StoreOpts struct {
+	// Root is the folder name in which all data will be stored
+	Root 	           string		   
 	PathTranformerFunc PathTranformer
 }
 
@@ -56,22 +63,39 @@ type Store struct {
 }
 
 func NewStore(storeOpts StoreOpts) *Store{
+	if storeOpts.PathTranformerFunc == nil{
+		storeOpts.PathTranformerFunc = DefaultPathTransformer
+	}
+	if len(storeOpts.Root) == 0{
+		storeOpts.Root = DeaultRootFolder
+	}
 	return &Store{
 		StoreOpts: storeOpts,
 	}
 }
 
 func (s *Store) Delete(key string) error{
-	pathKey := s.PathTranformerFunc(key)
+	pathKey := s.PathTranformerFunc(key,s.Root)
 
 	defer func(){
 		log.Printf("Deleted file [%s] from storage",pathKey.FileName)
 	}()
-	return os.RemoveAll(pathKey.GenerateFilePath())
+	return os.RemoveAll(pathKey.firstPathName())
+}
+
+func (s *Store) Has(key string) bool{
+	pathKey := s.PathTranformerFunc(key,s.Root)
+
+	_,err := os.Stat(pathKey.GenerateFilePath())
+	
+	if err == nil{
+		return true
+	}
+	return false
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser,error){
-	pathKey := s.PathTranformerFunc(key)
+	pathKey := s.PathTranformerFunc(key,s.Root)
 	filePath := pathKey.GenerateFilePath()
 
 	f,err := os.Open(filePath)
@@ -100,7 +124,7 @@ func (s *Store) BufferRead(key string) (io.ReadCloser,error){
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error{
-	pathKey := s.PathTranformerFunc(key)
+	pathKey := s.PathTranformerFunc(key,s.Root)
 
 	if err := os.MkdirAll(pathKey.PathName,os.ModePerm); err != nil{
 		return err

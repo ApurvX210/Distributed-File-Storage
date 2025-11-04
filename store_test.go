@@ -9,7 +9,7 @@ import (
 
 func TestPathTransformer(t *testing.T){
 	key := "Yash"
-	path := CASPathTransformer(key)
+	path := CASPathTransformer(key,"GG")
 	fmt.Println(path)
 }
 func TestStore(t *testing.T){
@@ -55,7 +55,7 @@ func TestDelete(t *testing.T){
 	store := NewStore(opts)
 
 	// data := bytes.NewReader([]byte("Hello my name is Apurv"))
-
+	fmt.Println(store.Has("specialPicture"))
 	err := store.Delete("specialPicture")
 	fmt.Println(err)
 }
