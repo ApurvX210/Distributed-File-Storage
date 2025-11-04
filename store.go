@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
@@ -60,7 +61,16 @@ func NewStore(storeOpts StoreOpts) *Store{
 	}
 }
 
-func (s *Store) readStream(key string) (io.Reader,error){
+func (s *Store) Delete(key string) error{
+	pathKey := s.PathTranformerFunc(key)
+
+	defer func(){
+		log.Printf("Deleted file [%s] from storage",pathKey.FileName)
+	}()
+	return os.RemoveAll(pathKey.GenerateFilePath())
+}
+
+func (s *Store) readStream(key string) (io.ReadCloser,error){
 	pathKey := s.PathTranformerFunc(key)
 	filePath := pathKey.GenerateFilePath()
 
@@ -72,12 +82,21 @@ func (s *Store) readStream(key string) (io.Reader,error){
 	return f,nil
 }
 
-func (s *Store) Read(key string) (io.Reader,error){
+func (s *Store) StreamRead(key string) (io.Reader,error){
 	f,err := s.readStream(key)
+
 	if err != nil{
 		return nil,err
 	}
+	defer f.Close()
+	buff := new(bytes.Buffer)
+	_,err = io.Copy(buff,f)
 
+	return buff,err
+}
+
+func (s *Store) BufferRead(key string) (io.ReadCloser,error){
+	return s.readStream(key)
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error{

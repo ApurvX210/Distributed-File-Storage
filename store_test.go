@@ -25,3 +25,37 @@ func TestStore(t *testing.T){
 	fmt.Println(err)
 	// assert.Equal(t,store.writeStream("specialPicture",data),nil)
 }
+
+func TestStoreRead(t *testing.T){
+	opts := StoreOpts{
+		PathTranformerFunc: CASPathTransformer,
+	}
+
+	store := NewStore(opts)
+
+	data := make([]byte,1024)
+
+	reader,err := store.readStream("specialPicture")
+
+	if err!= nil{
+		t.Error("Error Occured",err)
+	}
+	reader.Read(data)
+
+	fmt.Println(string(data))
+	// assert.Equal(t,store.writeStream("specialPicture",data),nil)
+}
+
+
+func TestDelete(t *testing.T){
+	opts := StoreOpts{
+		PathTranformerFunc: CASPathTransformer,
+	}
+
+	store := NewStore(opts)
+
+	// data := bytes.NewReader([]byte("Hello my name is Apurv"))
+
+	err := store.Delete("specialPicture")
+	fmt.Println(err)
+}
