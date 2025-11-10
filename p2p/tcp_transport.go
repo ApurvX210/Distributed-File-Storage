@@ -51,7 +51,9 @@ func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
 	}
 }
 
-// func ()
+func (tcp *TCPTransport) Consume() <- chan RPC{
+	return tcp.rpcChan
+}
 
 func (tcp *TCPTransport) ListenAndAccept() error{
 	var err error
@@ -62,7 +64,8 @@ func (tcp *TCPTransport) ListenAndAccept() error{
 		return err
 	}
 	slog.Info("Accepting Tcp connection on ","Address",tcp.ListenAddress)
-	return tcp.acceptRequests()
+	go tcp.acceptRequests()
+	return nil
 }
 
 func (tcp *TCPTransport) acceptRequests() error{
@@ -74,6 +77,11 @@ func (tcp *TCPTransport) acceptRequests() error{
 		}
 		go tcp.handleConnection(conn)
 	}
+}
+
+// Close implements the Transport Interface CLose function
+func (tcp *TCPTransport) Close() error{
+	return tcp.listener.Close()
 }
 
 func (tcp *TCPTransport) handleConnection(conn net.Conn){
@@ -111,6 +119,7 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn){
 			}
 		}
 		rpc.From = peer
+		tcp.rpcChan <- *rpc
 		fmt.Printf("%+v\n",rpc)
 	}
 }

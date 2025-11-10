@@ -7,13 +7,24 @@ import (
 
 func main() {
 	tcpOpts := p2p.TCPTransportOpts{
-		ListenAddress: "localhost:5001",
+		ListenAddress: ":5001",
 		ShakeHand: 	  p2p.TCPHandShake,
 		Decoder:	  p2p.DefaultDecoder{},
+		// To Do: OnPeerFunc
 	}
+
+	storeOpts := StoreOpts{
+		Root: "5001_DFA",
+		PathTranformerFunc: CASPathTransformer,
+	}
+
+	fsOpts := FileServerOpts{
+			StoreOpts: storeOpts,
+			Transport: p2p.NewTcpTransport(tcpOpts),
+		}
+	fs := NewFileServer(fsOpts)
 	
-	tcp := p2p.NewTcpTransport(tcpOpts)
-	log.Fatal(tcp.ListenAndAccept())
+	log.Fatal(fs.Start())
 
 	select{}
 }
