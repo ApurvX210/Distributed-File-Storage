@@ -45,7 +45,8 @@ type PathKey struct{
 }
 
 func (p PathKey) firstPathName() string{
-	return strings.Split(p.PathName,"/")[0]
+	path := strings.Split(p.PathName,"/")
+	return path[0] + "/" + path[1]
 }
 
 func (p *PathKey) GenerateFilePath() string{
@@ -81,6 +82,10 @@ func (s *Store) Delete(key string) error{
 		log.Printf("Deleted file [%s] from storage",pathKey.FileName)
 	}()
 	return os.RemoveAll(pathKey.firstPathName())
+}
+
+func (s *Store) Clear(key string) error{
+	return os.RemoveAll(s.Root)
 }
 
 func (s *Store) Has(key string) bool{
@@ -121,6 +126,10 @@ func (s *Store) StreamRead(key string) (io.Reader,error){
 
 func (s *Store) BufferRead(key string) (io.ReadCloser,error){
 	return s.readStream(key)
+}
+
+func (s *Store) Write(key string, r io.Reader) error{
+	return s.writeStream(key,r)
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error{
