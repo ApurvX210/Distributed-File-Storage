@@ -55,6 +55,16 @@ func (tcp *TCPTransport) Consume() <- chan RPC{
 	return tcp.rpcChan
 }
 
+// Dial Implements the Transport interface
+func (tcp *TCPTransport) Dial(addr string) error{
+	conn,err := net.Dial("tcp",addr)
+	if err != nil{
+		return err
+	}
+	go tcp.handleConnection(conn,true)
+	return nil
+}
+
 func (tcp *TCPTransport) ListenAndAccept() error{
 	var err error
 	tcp.listener,err = net.Listen("tcp",tcp.ListenAddress)
@@ -75,7 +85,7 @@ func (tcp *TCPTransport) acceptRequests() error{
 			log.Fatal("Error Occured while Accepting Request ",err)
 			return err
 		}
-		go tcp.handleConnection(conn)
+		go tcp.handleConnection(conn,false)
 	}
 }
 
@@ -84,10 +94,10 @@ func (tcp *TCPTransport) Close() error{
 	return tcp.listener.Close()
 }
 
-func (tcp *TCPTransport) handleConnection(conn net.Conn){
+func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 	var err error
 
-	peer := NewTCPPeer(conn,false)
+	peer := NewTCPPeer(conn,outbound)
 	defer func(){
 		peer.Close()
 		fmt.Printf("Dropping peer connection : %s",err)
@@ -104,8 +114,12 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn){
 			return
 		}
 	}
-
-	fmt.Printf("New Incoming Connection %+v\n",peer)
+	if outbound{
+		fmt.Printf("New Outgoing Connection %+v\n",peer)
+	}else{
+		fmt.Printf("New Incoming Connection %+v\n",peer)
+	}
+	
 	// Read Loop
 	rpc := &RPC{}
 	for{

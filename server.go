@@ -8,53 +8,66 @@ import (
 )
 
 type FileServerOpts struct {
-	StoreOpts     StoreOpts
-	Transport     p2p.Transport
+	StoreOpts     	StoreOpts
+	Transport    	p2p.Transport
+	quitch 			chan struct{}
+	BootStrapNodes	[]string
 }
 
 type FileServer struct {
 	FileServerOpts
+	
 	store *Store
-	quitch chan struct{}
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	return &FileServer{
 		FileServerOpts: opts,
 		store:          NewStore(opts.StoreOpts),
-		quitch: 		make(chan struct{}),
 	}
 }
 
-func (fso *FileServer) Start() error{
-	err := fso.Transport.ListenAndAccept()
+func (fs *FileServer) Start() error{
+	err := fs.Transport.ListenAndAccept()
 	if err != nil{
 		return err
 	}
-	fso.loop()
+	fs.bootStrapNetwork()
+	fs.loop()
 	return nil
 }
 
-func (fso *FileServer) loop(){
+func (fs *FileServer) bootStrapNetwork() error{
+	for _,addr := range fs.BootStrapNodes{
+		go func(addr string){
+			if err := fs.Transport.Dial(addr);err != nil{
+				log.Println("Dial Error Occured",err)
+			}
+		}(addr)
+	}
+	return nil
+}
+
+func (fs *FileServer) loop(){
 	defer func ()  {
 		log.Panicln("File Server Stopped")
-		fso.Transport.Close()
-		fso.stop()
+		fs.Transport.Close()
+		fs.stop()
 	}()
 	for{
 		select{
-		case msg := <- fso.Transport.Consume():
+		case msg := <- fs.Transport.Consume():
 			fmt.Println(msg)
-		case <-fso.quitch:
+		case <-fs.quitch:
 			return 
 		}
 	}
 }
 
-func (fso *FileServer) stop(){
-	close(fso.quitch)
+func (fs *FileServer) stop(){
+	close(fs.quitch)
 }
 
-// func (fso *FileServer) Store(key string,r io.Reader) error{
-// 	return fso.store.writeStream(key,r)
+// func (fs *FileServer) Store(key string,r io.Reader) error{
+// 	return fs.store.writeStream(key,r)
 // }
