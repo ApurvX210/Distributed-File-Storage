@@ -29,6 +29,17 @@ func (peer *TCPPeer) Close() error{
 	return peer.conn.Close()
 }
 
+func (peer *TCPPeer) Send(data []byte) error{
+	_,err := peer.conn.Write(data)
+	return err
+}
+
+// Remote address implement the peer interface
+// Returns the Remote address of underlying connection
+func (peer *TCPPeer) RemoteAddr() net.Addr{
+	return peer.conn.RemoteAddr()
+}
+
 type TCPTransportOpts struct{
 	ListenAddress string
 	ShakeHand 	  HandShakerFunc
@@ -108,7 +119,7 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 		peer.conn.Close()
 		return
 	}
-
+	fmt.Println(tcp.OnPeer)
 	if tcp.OnPeer != nil{
 		if err = tcp.OnPeer(peer); err != nil{
 			return

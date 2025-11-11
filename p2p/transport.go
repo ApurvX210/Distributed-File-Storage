@@ -1,8 +1,12 @@
 package p2p
 
+import "net"
+
 // Peers is the interface that represent the remote node
 type Peer interface{
-	Close() error
+	Send([]byte) error
+	RemoteAddr() 	net.Addr
+	Close() 		error
 }
 
 // Handle Communication between node in the network

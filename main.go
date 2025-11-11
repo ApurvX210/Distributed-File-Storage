@@ -2,6 +2,8 @@ package main
 
 import (
 	"Distributed-File-Storage/p2p"
+	"bytes"
+	"fmt"
 	"log"
 )
 
@@ -18,13 +20,20 @@ func makeServer(listenAddress string,nodes ...string) *FileServer{
 		PathTranformerFunc: CASPathTransformer,
 	}
 
+	tcpTransport := p2p.NewTcpTransport(tcpOpts)
+
 	fsOpts := FileServerOpts{
 			StoreOpts: storeOpts,
-			Transport: p2p.NewTcpTransport(tcpOpts),
+			Transport: tcpTransport,
 			quitch: 		make(chan struct{}),
 			BootStrapNodes:	nodes,
 		}
-	return NewFileServer(fsOpts)
+
+	fs := NewFileServer(fsOpts)
+
+	tcpTransport.OnPeer = fs.OnPeer
+
+	return fs
 	
 }
 
@@ -35,5 +44,8 @@ func main() {
 		log.Fatal(fs1.Start())
 	}()
 	log.Fatal(fs2.Start())
-	select{}
+	
+	data := bytes.NewReader([]byte("File Stored Here"))
+	fmt.Println(data)
+	fs2.StoreFile("key",data)
 }
