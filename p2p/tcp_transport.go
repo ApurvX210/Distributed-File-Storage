@@ -11,8 +11,7 @@ import (
 // It represent the remote user connected via Tcp protocol
 type TCPPeer struct{
 	// Underlying connection of the peer
-	conn net.Conn
-
+	net.Conn
 	// If we dial and a connection => outbound - true
 	// But if we accept and retrieve a connection => outbound - false
 	outbound bool
@@ -20,24 +19,24 @@ type TCPPeer struct{
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 	return &TCPPeer{
-		conn: conn,
-		outbound: outbound,
+		conn,
+		outbound,
 	}
 }
 
 func (peer *TCPPeer) Close() error{
-	return peer.conn.Close()
+	return peer.Close()
 }
 
 func (peer *TCPPeer) Send(data []byte) error{
-	_,err := peer.conn.Write(data)
+	_,err := peer.Write(data)
 	return err
 }
 
 // Remote address implement the peer interface
 // Returns the Remote address of underlying connection
 func (peer *TCPPeer) RemoteAddr() net.Addr{
-	return peer.conn.RemoteAddr()
+	return peer.RemoteAddr()
 }
 
 type TCPTransportOpts struct{
@@ -116,7 +115,7 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 	
 	if err = tcp.ShakeHand(peer); err!=nil{
 		slog.Error("Error occured while handshake with connection","Conn",conn)
-		peer.conn.Close()
+		peer.Close()
 		return
 	}
 	fmt.Println(tcp.OnPeer)

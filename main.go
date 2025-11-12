@@ -47,5 +47,5 @@ func main() {
 	
 	data := bytes.NewReader([]byte("File Stored Here"))
 	fmt.Println(data)
-	fs2.StoreFile("key",data)
+	fs2.StoreFile("My Data",data)
 }
