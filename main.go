@@ -3,8 +3,10 @@ package main
 import (
 	"Distributed-File-Storage/p2p"
 	"bytes"
-	"fmt"
+	// "fmt"
 	"log"
+	"strings"
+	"time"
 )
 
 func makeServer(listenAddress string,nodes ...string) *FileServer{
@@ -16,7 +18,7 @@ func makeServer(listenAddress string,nodes ...string) *FileServer{
 	}
 
 	storeOpts := StoreOpts{
-		Root: listenAddress+"DFA",
+		Root: strings.Split(listenAddress, ":")[1]+"_"+"DFA",
 		PathTranformerFunc: CASPathTransformer,
 	}
 
@@ -43,9 +45,13 @@ func main() {
 	go func ()  {
 		log.Fatal(fs1.Start())
 	}()
-	log.Fatal(fs2.Start())
+	go func ()  {
+		log.Fatal(fs2.Start())
+	}()
 	
-	data := bytes.NewReader([]byte("File Stored Here"))
-	fmt.Println(data)
+	time.Sleep(time.Second * 2)
+	data := bytes.NewReader([]byte("File Stored Here Apurv"))
+	// fmt.Println(data)
 	fs2.StoreFile("My Data",data)
+	select{}
 }

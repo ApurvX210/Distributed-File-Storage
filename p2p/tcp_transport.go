@@ -33,12 +33,6 @@ func (peer *TCPPeer) Send(data []byte) error{
 	return err
 }
 
-// Remote address implement the peer interface
-// Returns the Remote address of underlying connection
-func (peer *TCPPeer) RemoteAddr() net.Addr{
-	return peer.RemoteAddr()
-}
-
 type TCPTransportOpts struct{
 	ListenAddress string
 	ShakeHand 	  HandShakerFunc
@@ -118,7 +112,7 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 		peer.Close()
 		return
 	}
-	fmt.Println(tcp.OnPeer)
+	
 	if tcp.OnPeer != nil{
 		if err = tcp.OnPeer(peer); err != nil{
 			return
@@ -133,7 +127,6 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 	// Read Loop
 	rpc := &RPC{}
 	for{
-		fmt.Println("hello")
 		if err = tcp.Decoder.Decode(conn,rpc); err != nil{
 			if err == io.EOF{
 				return
@@ -144,6 +137,6 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 		}
 		rpc.From = peer
 		tcp.rpcChan <- *rpc
-		fmt.Printf("%+v\n",rpc)
+		fmt.Printf("Address %s %s %+v\n",tcp.ListenAddress,string(rpc.Payload),rpc)
 	}
 }

@@ -53,13 +53,11 @@ func (fs *FileServer) OnPeer(peer p2p.Peer) error{
 	fs.peerLock.Lock()
 	defer fs.peerLock.Unlock()
 	fs.peers[peer.RemoteAddr().String()] = peer
-	fmt.Printf("Coonnected with Remote %s",peer.RemoteAddr())
+	fmt.Printf("Connected with Remote %s",peer.RemoteAddr())
 	return nil
 }
 
-
-
-func (fs *FileServer) Broadcast(p Payload) error{
+func (fs *FileServer) Broadcast(p *Payload) error{
 	peers := []io.Writer{}
 	for _,peer := range fs.peers{
 		peers = append(peers, peer)
@@ -82,10 +80,20 @@ func (fs *FileServer) StoreFile(key string,file io.Reader) error{
 		return err
 	}
 
-	buf := bytes.Bufer
+	buf := new(bytes.Buffer)
+	_,err = io.Copy(buf,file)
+	if err != nil{
+		return err
+	}
+
 	p := Payload{
 		key: key,
-		Data: fs.store.BufferRead(key),
+		Data: buf.Bytes(),
+	}
+
+	err = fs.Broadcast(&p)
+	if err != nil{
+		return err
 	}
 
 	return nil
@@ -112,7 +120,18 @@ func (fs *FileServer) loop(){
 	for{
 		select{
 		case msg := <- fs.Transport.Consume():
-			fmt.Println(msg)
+			println("Hello my name is Apurv")
+			var p Payload
+			err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p)
+			if err != nil{
+				log.Printf("Error occured while decoding RPC Channel %s",err)
+				continue
+			}
+			err = fs.store.Write(p.key,bytes.NewReader(msg.Payload))
+			if err != nil{
+				log.Printf("Error occured while Storing file recieved from RPC Channel %s",err)
+				continue
+			}
 		case <-fs.quitch:
 			return 
 		}

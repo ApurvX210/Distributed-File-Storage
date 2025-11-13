@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"encoding/gob"
-	"fmt"
 	"io"
 )
 
@@ -13,7 +12,6 @@ type Decoder interface {
 type GobDecoder struct{}
 
 func (dec GobDecoder) Decode(r io.Reader, msg *RPC) error{
-	fmt.Println("My name is Apurv")
 	return gob.NewDecoder(r).Decode(msg)
 }
 
