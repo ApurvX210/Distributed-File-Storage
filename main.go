@@ -45,13 +45,14 @@ func main() {
 	go func ()  {
 		log.Fatal(fs1.Start())
 	}()
+	time.Sleep(time.Second)
 	go func ()  {
 		log.Fatal(fs2.Start())
 	}()
 	
 	time.Sleep(time.Second * 2)
-	data := bytes.NewReader([]byte("File Stored Here Apurv"))
+	data := bytes.NewReader([]byte("File Stored hello my name is apurv lorem dcbjsdvbds sdcbsdcjsd sdbcsdbkc sbcjkdsck kjsbdckjdbskjcbsdcbkdsbckdskc sdjbckjdsbckjdbckdsb"))
 	// fmt.Println(data)
-	fs2.StoreFile("My Data",data)
+	fs2.StoreData("My Data",data)
 	select{}
 }

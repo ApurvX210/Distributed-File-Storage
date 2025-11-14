@@ -15,4 +15,5 @@ type Transport interface{
 	Consume() <- chan RPC
 	Close() error
 	Dial(addr string) error
+	ListenAddr() string
 }

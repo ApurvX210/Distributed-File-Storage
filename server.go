@@ -25,10 +25,10 @@ type FileServer struct {
 	store 		*Store
 }
 
-type Payload struct{
-	key 	string
-	Data 	[]byte
+type Message struct{
+	Payload any
 }
+
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	return &FileServer{
@@ -57,46 +57,64 @@ func (fs *FileServer) OnPeer(peer p2p.Peer) error{
 	return nil
 }
 
-func (fs *FileServer) Broadcast(p *Payload) error{
+func (fs *FileServer) Broadcast(msg Message) error{
 	peers := []io.Writer{}
 	for _,peer := range fs.peers{
 		peers = append(peers, peer)
 	}
-
-	mu := io.MultiWriter(peers...)
-	err := gob.NewEncoder(mu).Encode(p)
+	buf := new(bytes.Buffer)
+	err := gob.NewEncoder(buf).Encode(msg)
 		if err != nil{
 			return err
 		}
 
-	return nil
+	mu := io.MultiWriter(peers...)
+	_,err = mu.Write(buf.Bytes())
+
+	return err
 }
 
-func (fs *FileServer) StoreFile(key string,file io.Reader) error{
+func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	// Store this file to the disk
 	// Broadcast this file to all known peer in the network
-	err := fs.store.Write(key,file)
-	if err != nil{
-		return err
-	}
 
+
+	msg := Message{
+		Payload: []byte("storagekey"),
+	}
 	buf := new(bytes.Buffer)
-	_,err = io.Copy(buf,file)
-	if err != nil{
+	if err := gob.NewEncoder(buf).Encode(msg); err != nil{
 		return err
 	}
 
-	p := Payload{
-		key: key,
-		Data: buf.Bytes(),
+	patload := []byte("This is my Large file")
+	for _,peer := range fs.peers{
+		if err := peer.Send(patload); err != nil{
+			return err
+		}
 	}
-
-	err = fs.Broadcast(&p)
-	if err != nil{
-		return err
-	}
-
 	return nil
+	// buf := new(bytes.Buffer)
+	// tee := io.TeeReader(r,buf)
+	// err := fs.store.Write(key,tee)
+	// if err != nil{
+	// 	return err
+	// }
+	
+	// _,err = io.Copy(buf,r)
+	// if err != nil{
+	// 	return err
+	// }
+
+	// p := DataMessage{
+	// 	key: key,
+	// 	Data: buf.Bytes(),
+	// }
+
+	// return fs.Broadcast(Message{
+	// 	from: fs.Transport.ListenAddr(),
+	// 	Payload: p,
+	// })
 }
 
 func (fs *FileServer) bootStrapNetwork() error{
@@ -119,23 +137,34 @@ func (fs *FileServer) loop(){
 	}()
 	for{
 		select{
-		case msg := <- fs.Transport.Consume():
+		case rpc := <- fs.Transport.Consume():
 			println("Hello my name is Apurv")
-			var p Payload
-			err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p)
+			var msg Message
+			err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg)
 			if err != nil{
-				log.Printf("Error occured while decoding RPC Channel %s",err)
+				log.Println("Error occured while decoding RPC Channel",err)
 				continue
 			}
-			err = fs.store.Write(p.key,bytes.NewReader(msg.Payload))
+			err = fs.handleMessage(&msg)
 			if err != nil{
-				log.Printf("Error occured while Storing file recieved from RPC Channel %s",err)
+				log.Printf("Error occured while Storing data recieved from RPC Channel %s",err)
 				continue
 			}
 		case <-fs.quitch:
 			return 
 		}
 	}
+}
+
+func (fs *FileServer) handleMessage(msg *Message) error{
+
+	switch msg.Payload.(type){
+	case *DataMessage:
+		payload := msg.Payload
+		fs.store.Write(msg.Payload.key)
+	}
+
+	return nil
 }
 
 func (fs *FileServer) stop(){

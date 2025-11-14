@@ -55,6 +55,10 @@ func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
 	}
 }
 
+func (tcp *TCPTransport) ListenAddr() string{
+	return tcp.ListenAddress
+}
+
 func (tcp *TCPTransport) Consume() <- chan RPC{
 	return tcp.rpcChan
 }
