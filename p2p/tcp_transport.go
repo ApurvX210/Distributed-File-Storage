@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"sync"
 )
 
 // It represent the remote user connected via Tcp protocol
@@ -15,17 +16,19 @@ type TCPPeer struct{
 	// If we dial and a connection => outbound - true
 	// But if we accept and retrieve a connection => outbound - false
 	outbound bool
+	Wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 	return &TCPPeer{
 		conn,
 		outbound,
+		&sync.WaitGroup{},
 	}
 }
 
 func (peer *TCPPeer) Close() error{
-	return peer.Close()
+	return peer.Conn.Close()
 }
 
 func (peer *TCPPeer) Send(data []byte) error{
@@ -139,8 +142,12 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 				continue
 			}
 		}
-		rpc.From = peer
+		rpc.From = peer.RemoteAddr().String()
+		peer.Wg.Add(1)
+		fmt.Println("Waiting till stream is done")
 		tcp.rpcChan <- *rpc
+		peer.Wg.Wait()
+		fmt.Println("Stream done continueing noraml read loop")
 		fmt.Printf("Address %s %s %+v\n",tcp.ListenAddress,string(rpc.Payload),rpc)
 	}
 }

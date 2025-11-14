@@ -29,6 +29,10 @@ type Message struct{
 	Payload any
 }
 
+type MessageStoreFile struct{
+	Key string
+}
+
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	return &FileServer{
@@ -77,22 +81,27 @@ func (fs *FileServer) Broadcast(msg Message) error{
 func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	// Store this file to the disk
 	// Broadcast this file to all known peer in the network
-
-
 	msg := Message{
-		Payload: []byte("storagekey"),
+		Payload: MessageStoreFile{
+			Key: key,
+		},
 	}
 	buf := new(bytes.Buffer)
 	if err := gob.NewEncoder(buf).Encode(msg); err != nil{
 		return err
 	}
-
-	patload := []byte("This is my Large file")
 	for _,peer := range fs.peers{
-		if err := peer.Send(patload); err != nil{
+		if err := peer.Send(buf.Bytes()); err != nil{
 			return err
 		}
 	}
+
+	// patload := []byte("This is my Large file")
+	// for _,peer := range fs.peers{
+	// 	if err := peer.Send(patload); err != nil{
+	// 		return err
+	// 	}
+	// }
 	return nil
 	// buf := new(bytes.Buffer)
 	// tee := io.TeeReader(r,buf)
@@ -145,27 +154,37 @@ func (fs *FileServer) loop(){
 				log.Println("Error occured while decoding RPC Channel",err)
 				continue
 			}
-			err = fs.handleMessage(&msg)
+			fmt.Printf("Recieved %+v\n",msg.Payload)
+			peer,ok := fs.peers[rpc.From]
+			if !ok{
+				log.Fatal("Peer not registered",peer)
+			}
+
+			buf := make([]byte,1024)
+			_,err = peer.Read(buf)
+
 			if err != nil{
 				log.Printf("Error occured while Storing data recieved from RPC Channel %s",err)
 				continue
 			}
+			fmt.Printf("Recieved %sn",string(buf))
+			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-fs.quitch:
 			return 
 		}
 	}
 }
 
-func (fs *FileServer) handleMessage(msg *Message) error{
+// func (fs *FileServer) handleMessage(msg *Message) error{
 
-	switch msg.Payload.(type){
-	case *DataMessage:
-		payload := msg.Payload
-		fs.store.Write(msg.Payload.key)
-	}
+// 	switch msg.Payload.(type){
+// 	case *DataMessage:
+// 		payload := msg.Payload
+// 		fs.store.Write(msg.Payload.key)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (fs *FileServer) stop(){
 	close(fs.quitch)
@@ -174,3 +193,7 @@ func (fs *FileServer) stop(){
 // func (fs *FileServer) Store(key string,r io.Reader) error{
 // 	return fs.store.writeStream(key,r)
 // }
+
+func init(){
+	gob.Register(MessageStoreFile{})
+}
