@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"io"
 	"net"
 )
 
@@ -8,6 +9,7 @@ import (
 type Peer interface{
 	net.Conn
 	Send([]byte) error
+	Stream(io.ReadCloser) error
 }
 
 // Handle Communication between node in the network

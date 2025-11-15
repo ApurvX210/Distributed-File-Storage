@@ -52,7 +52,6 @@ func main() {
 	
 	time.Sleep(time.Second * 2)
 	data := bytes.NewReader([]byte("File Stored hello my name is apurv lorem dcbjsdvbds sdcbsdcjsd sdbcsdbkc sbcjkdsck kjsbdckjdbskjcbsdcbkdsbckdskc sdjbckjdsbckjdbckdsb"))
-	// fmt.Println(data)
 	fs2.StoreData("My Data",data)
 	select{}
 }

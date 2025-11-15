@@ -30,7 +30,8 @@ type Message struct{
 }
 
 type MessageStoreFile struct{
-	Key string
+	Key 	string
+	Size 	int64
 }
 
 
@@ -81,9 +82,16 @@ func (fs *FileServer) Broadcast(msg Message) error{
 func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	// Store this file to the disk
 	// Broadcast this file to all known peer in the network
+
+	size,err := fs.store.Write(key,r)
+	if err != nil{
+		return err
+	}
+
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key: key,
+			Size: size,
 		},
 	}
 	buf := new(bytes.Buffer)
@@ -92,16 +100,18 @@ func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	}
 	for _,peer := range fs.peers{
 		if err := peer.Send(buf.Bytes()); err != nil{
-			return err
+			fmt.Println("Error occurred while broadcasting Message to store file to peer ",peer)
 		}
 	}
-
-	// patload := []byte("This is my Large file")
-	// for _,peer := range fs.peers{
-	// 	if err := peer.Send(patload); err != nil{
-	// 		return err
-	// 	}
-	// }
+	file,err := fs.store.BufferRead(key)
+	if err != nil{
+		return err
+	}
+	for _,peer := range fs.peers{
+		if err := peer.Stream(file); err != nil{
+			fmt.Println("Error occurred while broadcasting file to peer ",peer)
+		}
+	}
 	return nil
 	// buf := new(bytes.Buffer)
 	// tee := io.TeeReader(r,buf)
@@ -147,7 +157,6 @@ func (fs *FileServer) loop(){
 	for{
 		select{
 		case rpc := <- fs.Transport.Consume():
-			println("Hello my name is Apurv")
 			var msg Message
 			err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg)
 			if err != nil{
@@ -155,36 +164,39 @@ func (fs *FileServer) loop(){
 				continue
 			}
 			fmt.Printf("Recieved %+v\n",msg.Payload)
-			peer,ok := fs.peers[rpc.From]
-			if !ok{
-				log.Fatal("Peer not registered",peer)
-			}
 
-			buf := make([]byte,1024)
-			_,err = peer.Read(buf)
-
-			if err != nil{
-				log.Printf("Error occured while Storing data recieved from RPC Channel %s",err)
+			if err := fs.handleMessage(rpc.From,&msg);err != nil{
+				log.Printf("Error occured while handling message ",msg)
 				continue
 			}
-			fmt.Printf("Recieved %sn",string(buf))
-			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-fs.quitch:
 			return 
 		}
 	}
 }
 
-// func (fs *FileServer) handleMessage(msg *Message) error{
+func (fs *FileServer) handleMessage(from string,msg *Message) error{
 
-// 	switch msg.Payload.(type){
-// 	case *DataMessage:
-// 		payload := msg.Payload
-// 		fs.store.Write(msg.Payload.key)
-// 	}
+	switch v := msg.Payload.(type){
+	case MessageStoreFile:
+		return fs.handleMessageStoreFile(from,v)
+	}
 
-// 	return nil
-// }
+	return nil
+}
+
+func (fs *FileServer) handleMessageStoreFile(from string,msg MessageStoreFile) error{
+	peer,ok := fs.peers[from]
+	if !ok{
+		return fmt.Errorf("peer not registered %+v",peer)
+	}
+	_,err := fs.store.Write(msg.Key,io.LimitReader(peer,msg.Size))
+	if err != nil{
+		return fmt.Errorf("error occured while Storing data recieved from RPC Channel %s",err)
+	}
+	peer.(*p2p.TCPPeer).Wg.Done()
+	return nil
+}
 
 func (fs *FileServer) stop(){
 	close(fs.quitch)

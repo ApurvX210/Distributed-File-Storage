@@ -36,6 +36,11 @@ func (peer *TCPPeer) Send(data []byte) error{
 	return err
 }
 
+func (peer *TCPPeer) Stream(r io.ReadCloser) error{
+	_,err := io.Copy(peer,r)
+	return err
+}
+
 type TCPTransportOpts struct{
 	ListenAddress string
 	ShakeHand 	  HandShakerFunc
@@ -148,6 +153,5 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 		tcp.rpcChan <- *rpc
 		peer.Wg.Wait()
 		fmt.Println("Stream done continueing noraml read loop")
-		fmt.Printf("Address %s %s %+v\n",tcp.ListenAddress,string(rpc.Payload),rpc)
 	}
 }

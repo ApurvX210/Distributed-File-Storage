@@ -21,7 +21,7 @@ func TestStore(t *testing.T){
 
 	data := bytes.NewReader([]byte("Hello my name is Apurv"))
 
-	err := store.writeStream("specialPicture",data)
+	_,err := store.writeStream("specialPicture",data)
 	fmt.Println(err)
 	// assert.Equal(t,store.writeStream("specialPicture",data),nil)
 }
