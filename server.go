@@ -34,6 +34,10 @@ type MessageStoreFile struct{
 	Size 	int64
 }
 
+type MessageGetFile struct{
+	Key 	string
+}
+
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	return &FileServer{
@@ -62,7 +66,7 @@ func (fs *FileServer) OnPeer(peer p2p.Peer) error{
 	return nil
 }
 
-func (fs *FileServer) Broadcast(msg Message) error{
+func (fs *FileServer) stream(msg Message) error{
 	peers := []io.Writer{}
 	for _,peer := range fs.peers{
 		peers = append(peers, peer)
@@ -79,10 +83,22 @@ func (fs *FileServer) Broadcast(msg Message) error{
 	return err
 }
 
+func (fs *FileServer) broadcast(msg *Message) error{
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(msg); err != nil{
+		return err
+	}
+	for _,peer := range fs.peers{
+		if err := peer.Send(buf.Bytes()); err != nil{
+			fmt.Println("Error occurred while broadcasting Message to store file to peer ",peer)
+		}
+	}
+	return nil
+}
+
 func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	// Store this file to the disk
 	// Broadcast this file to all known peer in the network
-
 	size,err := fs.store.Write(key,r)
 	if err != nil{
 		return err
@@ -94,16 +110,12 @@ func (fs *FileServer) StoreData(key string,r io.Reader) error{
 			Size: size,
 		},
 	}
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(msg); err != nil{
+	err = fs.broadcast(&msg)
+	if err != nil{
 		return err
 	}
-	for _,peer := range fs.peers{
-		if err := peer.Send(buf.Bytes()); err != nil{
-			fmt.Println("Error occurred while broadcasting Message to store file to peer ",peer)
-		}
-	}
-	file,err := fs.store.BufferRead(key)
+
+	file,err := fs.store.Read(key)
 	if err != nil{
 		return err
 	}
@@ -113,28 +125,31 @@ func (fs *FileServer) StoreData(key string,r io.Reader) error{
 		}
 	}
 	return nil
-	// buf := new(bytes.Buffer)
-	// tee := io.TeeReader(r,buf)
-	// err := fs.store.Write(key,tee)
-	// if err != nil{
-	// 	return err
-	// }
-	
-	// _,err = io.Copy(buf,r)
-	// if err != nil{
-	// 	return err
-	// }
-
-	// p := DataMessage{
-	// 	key: key,
-	// 	Data: buf.Bytes(),
-	// }
-
-	// return fs.Broadcast(Message{
-	// 	from: fs.Transport.ListenAddr(),
-	// 	Payload: p,
-	// })
 }
+
+func (fs *FileServer) Get(key string) (io.Reader,error){
+	if fs.store.Has(key){
+		return fs.store.Read(key)
+	}
+
+	fmt.Errorf("file not found in Storage locally, fetching from network key : %s",key)
+
+	msg := Message{
+		Payload: MessageGetFile{
+			Key: key,
+		},
+	}
+	if err := fs.broadcast(&msg); err != nil{
+		return nil,err
+	}
+
+	return nil,fmt.Errorf("file not found in Storage locally key : %s",key)
+}
+
+func (fs *FileServer) handleMessageGetFile(from string,msg Message){
+
+}
+
 
 func (fs *FileServer) bootStrapNetwork() error{
 	for _,addr := range fs.BootStrapNodes{
@@ -180,6 +195,8 @@ func (fs *FileServer) handleMessage(from string,msg *Message) error{
 	switch v := msg.Payload.(type){
 	case MessageStoreFile:
 		return fs.handleMessageStoreFile(from,v)
+	case MessageGetFile:
+		return fs.Get(v.Key)
 	}
 
 	return nil
@@ -208,4 +225,5 @@ func (fs *FileServer) stop(){
 
 func init(){
 	gob.Register(MessageStoreFile{})
+	gob.Register(MessageGetFile{})
 }
