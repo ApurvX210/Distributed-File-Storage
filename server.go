@@ -132,7 +132,7 @@ func (fs *FileServer) Get(key string) (io.Reader,error){
 		return fs.store.Read(key)
 	}
 
-	fmt.Errorf("file not found in Storage locally, fetching from network key : %s",key)
+	fmt.Printf("file not found in Storage locally, fetching from network key : %s\n",key)
 
 	msg := Message{
 		Payload: MessageGetFile{
@@ -143,11 +143,9 @@ func (fs *FileServer) Get(key string) (io.Reader,error){
 		return nil,err
 	}
 
+	select{}
+
 	return nil,fmt.Errorf("file not found in Storage locally key : %s",key)
-}
-
-func (fs *FileServer) handleMessageGetFile(from string,msg Message){
-
 }
 
 
@@ -181,7 +179,7 @@ func (fs *FileServer) loop(){
 			fmt.Printf("Recieved %+v\n",msg.Payload)
 
 			if err := fs.handleMessage(rpc.From,&msg);err != nil{
-				log.Printf("Error occured while handling message ",msg)
+				log.Println("Error occured while handling message ",msg)
 				continue
 			}
 		case <-fs.quitch:
@@ -196,7 +194,7 @@ func (fs *FileServer) handleMessage(from string,msg *Message) error{
 	case MessageStoreFile:
 		return fs.handleMessageStoreFile(from,v)
 	case MessageGetFile:
-		return fs.Get(v.Key)
+		return fs.handleMessageGetFile(from,v)
 	}
 
 	return nil
@@ -212,6 +210,30 @@ func (fs *FileServer) handleMessageStoreFile(from string,msg MessageStoreFile) e
 		return fmt.Errorf("error occured while Storing data recieved from RPC Channel %s",err)
 	}
 	peer.(*p2p.TCPPeer).Wg.Done()
+	return nil
+}
+
+func (fs *FileServer) handleMessageGetFile(from string,msg MessageGetFile)error{
+	if !fs.store.Has(msg.Key){
+		return fmt.Errorf("File with given key not present in the server ",msg.Key)
+	}
+
+	r,err := fs.store.Read(msg.Key)
+	if err != nil{
+		return err
+	}
+	peer,ok := fs.peers[from]
+	if !ok{
+		return fmt.Errorf("peer not registered %+v",peer)
+	}
+
+	n, err := io.Copy(peer,r)
+	if err != nil{
+		return err
+	}
+
+	fmt.Printf("Send %d bytes to peer %+v\n",n,peer)
+
 	return nil
 }
 
