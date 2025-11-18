@@ -10,16 +10,16 @@ import (
 )
 
 // It represent the remote user connected via Tcp protocol
-type TCPPeer struct{
+type TCPPeer struct {
 	// Underlying connection of the peer
 	net.Conn
 	// If we dial and a connection => outbound - true
 	// But if we accept and retrieve a connection => outbound - false
 	outbound bool
-	Wg *sync.WaitGroup
+	wg       *sync.WaitGroup
 }
 
-func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		conn,
 		outbound,
@@ -27,132 +27,135 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
 	}
 }
 
-func (peer *TCPPeer) Close() error{
+func (peer *TCPPeer) Close() error {
 	return peer.Conn.Close()
 }
 
-func (peer *TCPPeer) Send(data []byte) error{
-	_,err := peer.Write(data)
+func (peer *TCPPeer) Send(data []byte) error {
+	_, err := peer.Write(data)
 	return err
 }
 
-func (peer *TCPPeer) Stream(r io.ReadCloser) error{
-	_,err := io.Copy(peer,r)
+func (peer *TCPPeer) Stream(r io.ReadCloser) error {
+	_, err := io.Copy(peer, r)
 	return err
 }
 
-type TCPTransportOpts struct{
+func (peer *TCPPeer) CloseStream(){
+	peer.wg.Done()
+}
+
+type TCPTransportOpts struct {
 	ListenAddress string
-	ShakeHand 	  HandShakerFunc
-	Decoder		  Decoder
-	OnPeer		  func(Peer) error
+	ShakeHand     HandShakerFunc
+	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
 type TCPTransport struct {
 	TCPTransportOpts
-	listener      net.Listener
-	rpcChan		  chan RPC
+	listener net.Listener
+	rpcChan  chan RPC
 	// mu			  sync.RWMutex
 	// peers         map[net.Addr]Peer
 }
 
-
-func NewTcpTransport(opts TCPTransportOpts) *TCPTransport{
+func NewTcpTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcChan: make(chan RPC),
+		rpcChan:          make(chan RPC),
 	}
 }
 
-func (tcp *TCPTransport) ListenAddr() string{
+func (tcp *TCPTransport) ListenAddr() string {
 	return tcp.ListenAddress
 }
 
-func (tcp *TCPTransport) Consume() <- chan RPC{
+func (tcp *TCPTransport) Consume() <-chan RPC {
 	return tcp.rpcChan
 }
 
 // Dial Implements the Transport interface
-func (tcp *TCPTransport) Dial(addr string) error{
-	conn,err := net.Dial("tcp",addr)
-	if err != nil{
+func (tcp *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
 		return err
 	}
-	go tcp.handleConnection(conn,true)
+	go tcp.handleConnection(conn, true)
 	return nil
 }
 
-func (tcp *TCPTransport) ListenAndAccept() error{
+func (tcp *TCPTransport) ListenAndAccept() error {
 	var err error
-	tcp.listener,err = net.Listen("tcp",tcp.ListenAddress)
+	tcp.listener, err = net.Listen("tcp", tcp.ListenAddress)
 
-	if err != nil{
-		log.Fatal("Error Occured while Initializing listener ",err)
+	if err != nil {
+		log.Fatal("Error Occured while Initializing listener ", err)
 		return err
 	}
-	slog.Info("Accepting Tcp connection on ","Address",tcp.ListenAddress)
+	slog.Info("Accepting Tcp connection on ", "Address", tcp.ListenAddress)
 	go tcp.acceptRequests()
 	return nil
 }
 
-func (tcp *TCPTransport) acceptRequests() error{
-	for{
-		conn,err := tcp.listener.Accept()
-		if err != nil{
-			log.Fatal("Error Occured while Accepting Request ",err)
+func (tcp *TCPTransport) acceptRequests() error {
+	for {
+		conn, err := tcp.listener.Accept()
+		if err != nil {
+			log.Fatal("Error Occured while Accepting Request ", err)
 			return err
 		}
-		go tcp.handleConnection(conn,false)
+		go tcp.handleConnection(conn, false)
 	}
 }
 
 // Close implements the Transport Interface CLose function
-func (tcp *TCPTransport) Close() error{
+func (tcp *TCPTransport) Close() error {
 	return tcp.listener.Close()
 }
 
-func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
+func (tcp *TCPTransport) handleConnection(conn net.Conn, outbound bool) {
 	var err error
 
-	peer := NewTCPPeer(conn,outbound)
-	defer func(){
+	peer := NewTCPPeer(conn, outbound)
+	defer func() {
 		peer.Close()
-		fmt.Printf("Dropping peer connection : %s",err)
+		fmt.Printf("Dropping peer connection : %s", err)
 	}()
-	
-	if err = tcp.ShakeHand(peer); err!=nil{
-		slog.Error("Error occured while handshake with connection","Conn",conn)
+
+	if err = tcp.ShakeHand(peer); err != nil {
+		slog.Error("Error occured while handshake with connection", "Conn", conn)
 		peer.Close()
 		return
 	}
-	
-	if tcp.OnPeer != nil{
-		if err = tcp.OnPeer(peer); err != nil{
+
+	if tcp.OnPeer != nil {
+		if err = tcp.OnPeer(peer); err != nil {
 			return
 		}
 	}
-	if outbound{
-		fmt.Printf("New Outgoing Connection %+v\n",peer)
-	}else{
-		fmt.Printf("New Incoming Connection %+v\n",peer)
+	if outbound {
+		fmt.Printf("New Outgoing Connection %+v\n", peer)
+	} else {
+		fmt.Printf("New Incoming Connection %+v\n", peer)
 	}
-	
+
 	// Read Loop
-	for{
+	for {
 		rpc := &RPC{}
-		if err = tcp.Decoder.Decode(conn,rpc); err != nil{
-			if err == io.EOF{
+		if err = tcp.Decoder.Decode(conn, rpc); err != nil {
+			if err == io.EOF {
 				return
-			}else{
-				slog.Error("Error occured while Reading the connection","Error",err)
+			} else {
+				slog.Error("Error occured while Reading the connection", "Error", err)
 				continue
 			}
 		}
 		rpc.From = peer.RemoteAddr().String()
-		
+
 		if rpc.Stream {
-			peer.Wg.Add(1)
+			peer.wg.Add(1)
 			fmt.Printf("[%s] incoming stream, waiting...\n", conn.RemoteAddr())
-			peer.Wg.Wait()
+			peer.wg.Wait()
 			fmt.Printf("[%s] stream closed, resuming read loop\n", conn.RemoteAddr())
 			continue
 		}

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -88,15 +89,16 @@ func (s *Store) Clear(key string) error {
 	return os.RemoveAll(s.Root)
 }
 
-func (s *Store) Has(key string) bool {
+func (s *Store) Has(key string) (int64,error) {
 	pathKey := s.PathTranformerFunc(key, s.Root)
 
-	_, err := os.Stat(pathKey.GenerateFilePath())
+	fileInfo, err := os.Stat(pathKey.GenerateFilePath())
 
 	if err == nil {
-		return true
+		fmt.Println("size ",fileInfo.Size())
+		return fileInfo.Size(),nil
 	}
-	return false
+	return 0,err
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
