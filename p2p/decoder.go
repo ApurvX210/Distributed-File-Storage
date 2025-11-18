@@ -27,10 +27,8 @@ func (dec DefaultDecoder) Decode(r io.Reader, msg *RPC) error{
 
 	// Incase of a stream we are not decoding what is being sent over the network
 	// We are just setting stream true so we can handle that in our handle message
-	switch peekBuf[0] {
-	case IncomingMessage:
-		msg.Stream = false
-	case IncomingStream:
+	stream := peekBuf[0] == IncomingStream
+	if stream {
 		msg.Stream = true
 		return nil
 	}

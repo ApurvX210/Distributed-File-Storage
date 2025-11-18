@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 	// "io"
 )
 
@@ -89,6 +90,7 @@ func (fs *FileServer) broadcast(msg *Message) error{
 		return err
 	}
 	for _,peer := range fs.peers{
+		peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(buf.Bytes()); err != nil{
 			fmt.Println("Error occurred while broadcasting Message to store file to peer ",peer)
 		}
@@ -119,7 +121,9 @@ func (fs *FileServer) StoreData(key string,r io.Reader) error{
 	if err != nil{
 		return err
 	}
+	// time.Sleep(time.Second)
 	for _,peer := range fs.peers{
+		peer.Send([]byte{p2p.IncomingStream})
 		if err := peer.Stream(file); err != nil{
 			fmt.Println("Error occurred while broadcasting file to peer ",peer)
 		}
@@ -205,6 +209,7 @@ func (fs *FileServer) handleMessageStoreFile(from string,msg MessageStoreFile) e
 	if !ok{
 		return fmt.Errorf("peer not registered %+v",peer)
 	}
+	time.Sleep(time.Second*2)
 	_,err := fs.store.Write(msg.Key,io.LimitReader(peer,msg.Size))
 	if err != nil{
 		return fmt.Errorf("error occured while Storing data recieved from RPC Channel %s",err)

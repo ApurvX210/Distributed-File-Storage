@@ -2,9 +2,9 @@ package main
 
 import (
 	"Distributed-File-Storage/p2p"
-	// "bytes"
-	"fmt"
-	"io"
+	"bytes"
+	// "fmt"
+	// "io"
 
 	// "fmt"
 	"log"
@@ -54,14 +54,14 @@ func main() {
 	}()
 	
 	time.Sleep(time.Second * 2)
-	// data := bytes.NewReader([]byte("File Stored hello my name is apurv lorem dcbjsdvbds sdcbsdcjsd sdbcsdbkc sbcjkdsck kjsbdckjdbskjcbsdcbkdsbckdskc sdjbckjdsbckjdbckdsb"))
-	// fs2.StoreData("My Data",data)
+	data := bytes.NewReader([]byte("File Stored hello my name is apurv lorem dcbjsdvbds sdcbsdcjsd sdbcsdbkc sbcjkdsck kjsbdckjdbskjcbsdcbkdsbckdskc sdjbckjdsbckjdbckdsb"))
+	fs2.StoreData("My Data",data)
 
-	r, err := fs2.Get("My Data")
-	if err != nil{
-		log.Fatal(err)
-	}
-	b, err := io.ReadAll(r)
-	fmt.Println(string(b))
+	// r, err := fs2.Get("My Data")
+	// if err != nil{
+	// 	log.Fatal(err)
+	// }
+	// b, err := io.ReadAll(r)
+	// fmt.Println(string(b))
 	select{}
 }

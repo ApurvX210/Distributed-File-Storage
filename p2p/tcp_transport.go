@@ -137,8 +137,8 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 	}
 	
 	// Read Loop
-	rpc := &RPC{}
 	for{
+		rpc := &RPC{}
 		if err = tcp.Decoder.Decode(conn,rpc); err != nil{
 			if err == io.EOF{
 				return
@@ -148,10 +148,14 @@ func (tcp *TCPTransport) handleConnection(conn net.Conn,outbound bool){
 			}
 		}
 		rpc.From = peer.RemoteAddr().String()
-		peer.Wg.Add(1)
-		fmt.Println("Waiting till stream is done")
+		
+		if rpc.Stream {
+			peer.Wg.Add(1)
+			fmt.Printf("[%s] incoming stream, waiting...\n", conn.RemoteAddr())
+			peer.Wg.Wait()
+			fmt.Printf("[%s] stream closed, resuming read loop\n", conn.RemoteAddr())
+			continue
+		}
 		tcp.rpcChan <- *rpc
-		peer.Wg.Wait()
-		fmt.Println("Stream done continueing noraml read loop")
 	}
 }
