@@ -249,6 +249,9 @@ func (fs *FileServer) handleMessageGetFile(from string, msg MessageGetFile) erro
 	}
 
 	r, err := fs.store.Read(msg.Key)
+	if err == nil{
+		defer r.Close()
+	}
 	if err != nil {
 		return err
 	}
