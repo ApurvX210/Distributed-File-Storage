@@ -22,6 +22,9 @@ This project implements a distributed file storage system where multiple server 
 - **Pluggable Path Transformer**: Flexible file path generation (supports both flat and hierarchical storage)
 - **Graceful Error Handling**: Comprehensive error handling for network and storage operations
 - **Stream-Based I/O**: Efficient streaming of files between nodes using Go's io.Reader/io.Writer interfaces
+- **AES Encryption Support**: Files can be encrypted using AES-CTR cipher mode with 256-bit keys
+- **Unicast & Broadcast Messaging**: Supports both unicast and broadcast communication patterns
+- **Binary Protocol**: Efficient file size transmission using binary encoding (Little Endian)
 
 ## Architecture
 
@@ -45,6 +48,11 @@ This project implements a distributed file storage system where multiple server 
 - `CASPathTransformer`: Hierarchical directory structure based on SHA-1 hash of file keys
 - `DefaultPathTransformer`: Simple flat directory structure
 
+**4. Encryption Module** (`crypto.go`)
+- `copyEncrypt()`: Encrypts data using AES-CTR with random IV prepended
+- `copyDcrypt()`: Decrypts AES-CTR encrypted data with embedded IV
+- `newEncrptionKey()`: Generates random 256-bit encryption keys
+
 ## File Structure
 
 ```
@@ -58,7 +66,9 @@ This project implements a distributed file storage system where multiple server 
 ├── main.go                 # Entry point and server setup
 ├── server.go               # FileServer implementation
 ├── store.go                # Storage layer implementation
+├── crypto.go               # Encryption/Decryption utilities
 ├── store_test.go           # Storage tests
+├── crypto_test.go          # Encryption tests
 ├── go.mod                  # Go module definition
 └── Taskfile.yml            # Task automation
 ```
@@ -119,12 +129,20 @@ This approach provides:
 2. **MessageGetFile**: Requests a file from peers
    - `Key`: File identifier to retrieve
 
+### Communication Patterns
+- **Broadcast**: Sends messages to all connected peers simultaneously
+- **Unicast**: Sends messages to specific peer nodes
+- **Stream Protocol**: Uses binary encoding for file size transmission with `IncomingStream` message type
+
 ### Communication Flow
-1. Node stores a file locally
-2. Broadcasts `MessageStoreFile` to all connected peers
-3. Sends actual file data via `Stream()` method
-4. Peers receive and store the file
-5. When retrieving, node checks local storage first, then broadcasts `MessageGetFile` to network
+1. Node stores a file locally via `StoreData(key, reader)`
+2. Broadcasts `MessageStoreFile` metadata to all connected peers
+3. Sends actual file data via stream to each peer
+4. Peers receive and store the file using `handleMessageStoreFile()`
+5. When retrieving via `Get(key)`, node checks local storage first
+6. If not found locally, broadcasts `MessageGetFile` request to network
+7. Peers respond with file size (binary encoded) followed by file data
+8. Node writes received data to local storage and returns reader
 
 ## Current Status
 
@@ -136,15 +154,19 @@ This approach provides:
 - ✅ File replication across peers
 - ✅ Bootstrap node connectivity
 - ✅ Concurrent request handling
+- ✅ Unicast and broadcast messaging
+- ✅ Binary protocol for efficient size transmission
+- ✅ AES-CTR encryption functions
 
 ### In Progress / Planned
-- 🔄 Complete file retrieval from network peers
+- 🔄 Integrate encryption into file storage/retrieval pipeline
 - 🔄 Persistence of peer metadata
 - 🔄 File versioning and conflict resolution
-- 🔄 Compression and encryption
+- 🔄 Data compression support
 - 🔄 Performance optimization and benchmarking
-- 🔄 Comprehensive test coverage
+- 🔄 Comprehensive test coverage for encryption
 - 🔄 REST API layer
+- 🔄 Multi-stream parallel file transfer
 
 ## Testing
 ```bash
@@ -154,22 +176,26 @@ go test ./...
 ## Technologies & Concepts
 
 - **Go**: Concurrency with goroutines and channels
-- **Networking**: TCP sockets, custom protocol design
+- **Networking**: TCP sockets, custom protocol design, binary protocol
 - **Distributed Systems**: P2P architecture, replication, eventual consistency
 - **Serialization**: Gob encoding for binary message format
 - **File I/O**: Stream-based I/O with io.Reader/io.Writer interfaces
-- **Cryptography**: SHA-1 hashing for content addressing
-- **Concurrency Patterns**: RWMutex for thread-safe operations, WaitGroups
+- **Cryptography**: SHA-1 hashing for content addressing, AES-CTR encryption
+- **Encryption**: AES cipher in CTR mode with random initialization vectors
+- **Concurrency Patterns**: RWMutex for thread-safe operations, channel-based communication
 
 ## Future Enhancements
 
-1. **Consensus Protocol**: Implement RAFT or similar for consistency guarantees
-2. **Delete Propagation**: Ensure deleted files are removed from all peers
-3. **Network Topology**: Implement Kademlia DHT for better peer discovery
-4. **Monitoring & Metrics**: Add Prometheus metrics for network health
-5. **REST API**: HTTP interface for easier interaction
-6. **Docker Support**: Containerization for easier deployment
-7. **Security**: Add TLS/SSL encryption for peer communication
+1. **Transparent Encryption**: Automatically encrypt/decrypt files during storage operations
+2. **Consensus Protocol**: Implement RAFT or similar for consistency guarantees
+3. **Delete Propagation**: Ensure deleted files are removed from all peers
+4. **Network Topology**: Implement Kademlia DHT for better peer discovery
+5. **Monitoring & Metrics**: Add Prometheus metrics for network health
+6. **REST API**: HTTP interface for easier interaction
+7. **Docker Support**: Containerization for easier deployment
+8. **TLS/SSL**: Secure peer communication with certificate-based authentication
+9. **Key Management**: Distributed key management for encryption
+10. **Data Compression**: GZIP or Snappy compression for bandwidth optimization
 
 ## Author
 Apurv
